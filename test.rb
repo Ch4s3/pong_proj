@@ -1,9 +1,10 @@
+
 require 'rubygems'
 require 'rubygame'
 
 class Game
     def initialize
-        @screen = Rubygame::Screen.new [640, 480], 0, [Rubygame::HWSURFACE, Rubygame::DOUBLEBUF]
+        @screen = Rubygame::Screen.new [1280, 480], 0, [Rubygame::HWSURFACE, Rubygame::DOUBLEBUF]
         @screen.title = "Pong"
         
         @queue = Rubygame::EventQueue.new
@@ -15,6 +16,7 @@ class Game
         @enemy = Paddle.new @screen.width-50-@player.width, 10, Rubygame::K_UP, Rubygame::K_DOWN, 10, limit
         @player.center_y @screen.height
         @enemy.center_y @screen.height
+        @ball = Ball.new @screen.width/2, @screen.height/2
         
         @background = Background.new @screen.width, @screen.height
     end
@@ -30,6 +32,7 @@ class Game
     def update
         @player.update
         @enemy.update
+        @ball.update @screen
         
         @queue.each do |ev|
             @player.handle_event ev
@@ -44,6 +47,9 @@ class Game
                     end
             end
         end
+        
+        @ball.collision @player, @screen if collision? @ball, @player
+        @ball.collision @enemy, @screen if collision? @ball, @enemy
     end
     
     def draw
@@ -52,8 +58,17 @@ class Game
         @background.draw @screen
         @player.draw @screen
         @enemy.draw @screen
+        @ball.draw @screen
 
         @screen.flip
+    end
+    
+    def collision? obj1, obj2
+        if obj1.y + obj1.height < obj2.y ; return false ; end
+        if obj1.y > obj2.y + obj2.height ; return false ; end
+        if obj1.x + obj1.width < obj2.x ; return false ; end
+        if obj1.x > obj2.x + obj2.width ; return false ; end
+        return true
     end
 end
 
@@ -130,6 +145,12 @@ class Background < GameObject
         # Draw background
         white = [255, 255, 255]
         
+        #middle circle
+        surface.draw_circle_s [surface.width/2,surface.height/2], 100, white # [surface, center, radius, color]
+        
+        #middle circle black
+        surface.draw_circle_s [surface.width/2,surface.height/2], 90, [0,0,0]
+        
         # Top
         surface.draw_box_s [0, 0], [surface.width, 10], white
         # Left
@@ -145,6 +166,47 @@ class Background < GameObject
     end 
 end
 
+class Ball < GameObject
+    def initialize x, y
+        surface = Rubygame::Surface.load "ruby.png"
+        @vx = @vy = 9
+        super x, y, surface
+    end
+    
+    def update screen
+        @x += @vx
+        @y += @vy
+        
+        # Left or Right
+        if @x <= 10 or @x+@width >= screen.width-10
+            @vx *= -1
+        end
+        
+        # Top or Bottom
+        if @y <= 10 or @y+@height >= screen.height-10
+            @vy *= -1
+        end
+    end
+    
+    def collision paddle, screen
+        # Determine which paddle we've hit
+        # Left
+        if paddle.x < screen.width/2
+            # Check if we are behind the paddle
+            # (we use a 5 pixel buffer just in case)
+            unless @x < paddle.x-5
+                @x = paddle.x+paddle.width+1
+                @vx *= -1
+            end
+        # Right
+        else
+            unless @x > paddle.x+5
+                @x = paddle.x-@width-1
+                @vx *= -1
+            end
+        end
+    end
+end
+
 g = Game.new
 g.run!
-
