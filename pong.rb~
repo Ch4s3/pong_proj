@@ -313,7 +313,7 @@ class Ball < GameObject
 end
 
 class Text < GameObject
-        def initialize x=0, y=0, text="Welcome to Speed Pong", size = 48
+        def initialize x=0, y=0, text="Speed Pong", size = 32
                 @font = Rubygame::TTF.new "GeosansLight.ttf", size
                 @text = text
                 
