@@ -213,10 +213,10 @@ class Paddle < GameObject
     
     def update
         if @moving_up and @y > @top_limit
-            @y -= 7
+            @y -= 14
         end
         if @moving_down and @y+@height < @bottom_limit
-            @y += 7
+            @y += 14
         end
     end
 end
@@ -252,7 +252,12 @@ end
 class Ball < GameObject
     def initialize x, y
         surface = Rubygame::Surface.load "ruby.png"
-        @vx = @vy = 9
+        velocityPlusMinus = rand(2)
+        if velocityPlusMinus == 0
+                velocityPlusMinus = -1
+        end
+        #puts velocityPlusMinus
+        @vx = @vy = 8.25*velocityPlusMinus
         super x, y, surface
     end
     
@@ -274,7 +279,7 @@ class Ball < GameObject
         
         # Left or Right
         if @x <= 10 or @x+@width >= screen.width-10
-            @vx *= -1.01
+            @vx *= -1.015
         end
         
         # Top or Bottom
