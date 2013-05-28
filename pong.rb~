@@ -14,15 +14,41 @@ class Game
         @clock.target_framerate = 60
         
         limit = @screen.height - 10
-        @player = Paddle.new 50, 10, Rubygame::K_W, Rubygame::K_S, 10, limit
-        @enemy = Paddle.new @screen.width-50-@player.width, 10, Rubygame::K_UP, Rubygame::K_DOWN, 10, limit
+        player_score_x = @screen.width * 0.20 #128
+        enemy_score_x = @screen.width * 0.70 #448
+        @player = Paddle.new 50, 10, \
+                player_score_x, 35, \
+                Rubygame::K_W, Rubygame::K_S, 10, limit
+        @enemy = Paddle.new @screen.width-50-@player.width, 10, \
+                enemy_score_x, 35, \
+                Rubygame::K_UP, Rubygame::K_DOWN, 10, limit
         @player.center_y @screen.height
         @enemy.center_y @screen.height
+        
         @ball = Ball.new @screen.width/2, @screen.height/2
         @text = Text.new 35, 35
         
+        @won = false
+        
+        @win_txt = Text.new
+        @play_again_txt = Text.new 0, 0, "Play Again? Pres Y or N", 40
+        
         @background = Background.new @screen.width, @screen.height
     end
+    
+    def win player
+        if player == 1
+                @win_txt.text = "Player 1 Wins!"
+        elsif player == 2
+                @win_txt.text = "Player 2 Wins!"
+        end
+        
+        @won = true
+        @win_txt.center_x @screen.width
+        @win_txt.center_y @screen.height
+        @play_again_txt.y = @win_txt.y + 60
+    end 
+
     
     def run!
         loop do
@@ -35,8 +61,17 @@ class Game
     def update
         @player.update
         @enemy.update
-        @ball.update @screen
+        @ball.update @screen, @player, @enemy unless @won
         #@text.text = rand(100).to_s
+        if @player.score == 5
+                #puts "Player 1 Wins!"
+                win 1
+                #exit
+        elsif @enemy.score == 5
+                #puts "Player 2 Wins!"
+                win 2
+                #exit
+        end
         
         @queue.each do |ev|
             @player.handle_event ev
@@ -49,6 +84,19 @@ class Game
                     if ev.key == Rubygame::K_ESCAPE
                         @queue.push Rubygame::QuitEvent.new
                     end
+                if ev.key == Rubygame::K_Y and @won
+                        #reset
+                        @player.center_y @screen.height
+                        @enemy.center_y @screen.height
+                        @player.score = 0
+                        @enemy.score = 0
+                        @won = false
+                end
+                
+                if ev.key == Rubygame::K_N and @won
+                        Rubygame.quit
+                        exit
+                end
             end
         end
         
@@ -59,11 +107,16 @@ class Game
     def draw
         @screen.fill [0,0,0]
         
-        @background.draw @screen
-        @player.draw @screen
-        @enemy.draw @screen
-        @ball.draw @screen
-        @text.draw @screen
+        unless @won
+                @background.draw @screen
+                @player.draw @screen
+                @enemy.draw @screen
+                @ball.draw @screen
+                @text.draw @screen
+        else
+                @win_txt.draw @screen
+                @play_again_txt.draw @screen
+        end
 
         @screen.flip
     end
@@ -88,6 +141,14 @@ class GameObject
         @height = surface.height
     end
     
+    def center_x w
+        @x = w/2-@width/2
+    end
+    
+    def center_y h
+        @y = h/2-@height/2
+    end
+    
     def update
     end
     
@@ -100,7 +161,7 @@ class GameObject
 end
 
 class Paddle < GameObject
-    def initialize x, y, up_key, down_key, top_limit, bottom_limit
+    def initialize x, y, score_x, score_y, up_key, down_key, top_limit, bottom_limit
         surface = Rubygame::Surface.new [20, 100]
         surface.fill [255, 255, 255]
         @up_key = up_key
@@ -109,11 +170,28 @@ class Paddle < GameObject
         @moving_down = false
         @top_limit = top_limit
         @bottom_limit = bottom_limit
+        @score = 0
+        @score_txt = Text.new score_x, score_y, @score.to_s, 100
+        
         super x, y, surface
     end
     
     def center_y h
         @y = h/2-@height/2
+    end
+    
+    def score
+        @score
+    end
+    
+    def score= num
+        @score = num
+        @score_txt.text = num.to_s
+    end
+    
+    def draw screen
+        super
+        @score_txt.draw screen
     end
     
     def handle_event event
@@ -178,20 +256,41 @@ class Ball < GameObject
         super x, y, surface
     end
     
-    def update screen
+    def update screen, player, enemy
         @x += @vx
         @y += @vy
         
+        # L side score for enemy
+        if @x <= 10
+                enemy.score += 1
+                score screen
+        end
+        
+        # R side score for player 
+        if @x+@width >= screen.width-10
+                player.score += 1
+                score screen
+        end
+        
         # Left or Right
         if @x <= 10 or @x+@width >= screen.width-10
-            @vx *= -1.1
+            @vx *= -1.01
         end
         
         # Top or Bottom
         if @y <= 10 or @y+@height >= screen.height-10
-            @vy *= -1.1
+            @vy *= -1.01
         end
     end
+    
+    def score screen
+        @vx *= -1
+        # Move to the middle 2/4ths of the screen
+	@x = screen.width/4 + rand(screen.width/2)
+        # anywhere on the y-axis except along the edges
+        @y = rand(screen.height-50)+25
+    end
+        
     
     def collision paddle, screen
         # Determine which paddle we've hit
@@ -214,9 +313,10 @@ class Ball < GameObject
 end
 
 class Text < GameObject
-        def initialize x=0, y=0, text="Welcome to Speed Pong.", size = 48
+        def initialize x=0, y=0, text="Welcome to Speed Pong", size = 48
                 @font = Rubygame::TTF.new "GeosansLight.ttf", size
                 @text = text
+                
                 super x, y, @font.render(@text, true, [255,255,255])
         end
         
